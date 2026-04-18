@@ -17,9 +17,6 @@ function hasKvEnv(): boolean {
 
 async function kvClient() {
   if (!hasKvEnv()) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Vercel KV is not configured. Set KV_REST_API_URL and KV_REST_API_TOKEN.");
-    }
     return null;
   }
   const { kv } = await import("@vercel/kv");

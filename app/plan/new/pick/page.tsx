@@ -18,6 +18,7 @@ const fallbackInputs: IntakeInputs = {
 
 export default function PickPage() {
   const router = useRouter();
+  const dinnerTarget = 3;
   const [inputs, setInputs] = useState<IntakeInputs>(fallbackInputs);
   const [candidates, setCandidates] = useState<CandidateRecipe[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
@@ -61,13 +62,13 @@ export default function PickPage() {
   function toggle(recipeId: number) {
     setSelected((current) => {
       if (current.includes(recipeId)) return current.filter((id) => id !== recipeId);
-      if (current.length >= 3) return current;
+      if (current.length >= dinnerTarget) return current;
       return [...current, recipeId];
     });
   }
 
   async function buildCart() {
-    if (selected.length !== 3) return;
+    if (selected.length !== dinnerTarget) return;
     setBuilding(true);
     setError("");
     try {
@@ -88,35 +89,58 @@ export default function PickPage() {
   }
 
   const count = selected.length;
+  const selectionPct = (count / dinnerTarget) * 100;
+  const selectionStatus = building ? "Forming cart" : count === dinnerTarget ? "Ready" : "Progress";
+  const selectionValueText = building ? "Combining groceries" : `${count} of ${dinnerTarget} dinners selected`;
 
   return (
     <main style={{ background: "var(--paper)", minHeight: "100vh", paddingBottom: 120 }}>
       <MiniNav step="pick" />
       <div style={{ position: "sticky", top: 68, zIndex: 40, background: "rgba(247,242,233,0.9)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--rule)" }}>
-        <div className="container" style={{ padding: "20px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="container pick-header-bar" style={{ padding: "20px 32px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
           <div>
             <span className="t-label-xs ink-paprika">Step 2 of 3</span>
             <div className="t-display-s mt-4">
               Pick <i>three dinners.</i>
             </div>
           </div>
-          <div>
-            {count === 3 ? (
-              <span className="badge beet">
-                <Check size={12} /> 3 of 3
+          <div
+            className="pick-progress"
+            role="progressbar"
+            aria-label="Dinner selection progress"
+            aria-valuemin={0}
+            aria-valuemax={dinnerTarget}
+            aria-valuenow={count}
+            aria-valuetext={selectionValueText}
+          >
+            <div className="pick-progress-meta">
+              <span className="t-label-xs ink-soft">{selectionStatus}</span>
+              <span className={`t-data-m ${count > 0 ? "" : "ink-whisper"}`}>
+                {count}/{dinnerTarget}
               </span>
-            ) : (
-              <span className="t-data-l">
-                <span className={count > 0 ? "ink-paprika" : "ink-whisper"}>{count}</span>
-                <span className="ink-whisper">/3</span>
-              </span>
-            )}
+            </div>
+            <div className="pick-progress-track" aria-hidden="true">
+              <motion.div
+                className={`pick-progress-fill ${count === dinnerTarget ? "complete" : ""} ${building ? "building" : ""}`}
+                initial={false}
+                animate={{ width: `${selectionPct}%` }}
+                transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       <div className="container" style={{ padding: "48px 32px" }}>
         <ErrorNote>{error}</ErrorNote>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+          <div className="t-body-m ink-soft" style={{ maxWidth: 640 }}>
+            Choose the three dinners you want most. Korbly will merge overlapping groceries and smooth the cart before checkout.
+          </div>
+          <div className="t-body-s ink-soft">
+            {inputs.needText.trim() ? `Using your note: "${inputs.needText.trim().slice(0, 72)}${inputs.needText.trim().length > 72 ? "…" : ""}"` : "No extra note yet"}
+          </div>
+        </div>
         <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
           {loading
             ? Array.from({ length: 6 }).map((_, index) => <SkeletonCard key={index} />)
@@ -173,8 +197,8 @@ export default function PickPage() {
           <Link className="btn btn-ghost" href="/plan/new">
             ← Preferences
           </Link>
-          <button className="btn btn-primary" disabled={count < 3 || building} onClick={buildCart}>
-            {building ? "Building cart..." : "Build my cart"} <ArrowRight size={16} />
+          <button className="btn btn-primary" disabled={count < dinnerTarget || building} onClick={buildCart}>
+            {building ? "Combining groceries..." : "Combine groceries"} <ArrowRight size={16} />
           </button>
         </div>
       </div>

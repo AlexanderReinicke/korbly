@@ -15,6 +15,12 @@ const defaultInputs: IntakeInputs = {
   cuisines: ["Austrian"]
 };
 
+const householdOptions: Array<{ value: IntakeInputs["householdSize"]; label: string; detail: string }> = [
+  { value: 2, label: "Two people", detail: "Weeknight dinners sized for a pair." },
+  { value: 3, label: "Three people", detail: "A small table with a little stretch." },
+  { value: 4, label: "Four people", detail: "Family-style portions and fewer top-ups." }
+];
+
 export default function IntakePage() {
   const router = useRouter();
   const [state, setState] = useState<IntakeInputs>(defaultInputs);
@@ -81,106 +87,149 @@ export default function IntakePage() {
     }));
   }
 
+  const trimmedAllergyText = state.allergyText.trim();
+  const activeLimits = state.dietFilters.length + (trimmedAllergyText ? 1 : 0);
+  const cuisineReady = state.cuisines.length > 0;
+  const restrictionsSummary = activeLimits
+    ? [...state.dietFilters, ...(trimmedAllergyText ? [trimmedAllergyText] : [])].join(" · ")
+    : "Open to anything";
+
   return (
-    <main className="paper-grain" style={{ minHeight: "100vh" }}>
+    <main className="paper-grain intake-page" style={{ minHeight: "100vh" }}>
       <MiniNav step="intake" />
-      <div className="container-card" style={{ padding: "96px 24px" }}>
-        <span className="t-label-xs ink-paprika">Step 1 of 3</span>
-        <h1 className="t-display-l mt-12" style={{ margin: 0 }}>
-          How do you <i>eat?</i>
-        </h1>
-        <p className="t-body-m ink-soft mt-12">One minute. We use this to pick six dinners you&apos;d actually cook.</p>
+      <div className="intake-stage intake-stage-compact">
+        <div className="container">
+          <motion.section
+            className="intake-form-shell intake-form-shell-compact"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.38, ease: "easeOut" }}
+          >
+            <div className="intake-form-header intake-form-header-compact">
+              <div>
+                <span className="t-label-xs ink-paprika">Step 1 of 3</span>
+                <h1 className="t-display-m intake-page-title mt-8" style={{ margin: 0 }}>
+                  What do you need?
+                </h1>
+              </div>
+            </div>
 
-        <div className="mt-40">
-          <div className="t-label-xs mb-16">Tell us what you need</div>
-          <textarea
-            className="textarea"
-            rows={4}
-            maxLength={600}
-            placeholder="Weeknight dinners for two, easy lunches, snacks for guests, not too spicy, pantry top-up..."
-            value={state.needText}
-            onChange={(event) => setState({ ...state, needText: event.target.value })}
-          />
-          <p className="t-body-s ink-soft mt-12">
-            Optional. Share the shape of the week and we&apos;ll use it alongside your filters and cuisines.
-          </p>
-        </div>
+            <div className="intake-compact-grid">
+              <section className="intake-panel intake-panel-note">
+                <div className="intake-panel-head">
+                  <label className="intake-panel-title" htmlFor="need-text">
+                    Need
+                  </label>
+                  <span className="t-data-m ink-whisper">{state.needText.length}/600</span>
+                </div>
+                <textarea
+                  id="need-text"
+                  className="textarea intake-textarea intake-textarea-compact"
+                  rows={3}
+                  maxLength={600}
+                  placeholder="Weeknight dinners, pantry top-up, guests, easy lunches..."
+                  value={state.needText}
+                  onChange={(event) => setState({ ...state, needText: event.target.value })}
+                />
+              </section>
 
-        <div className="mt-48">
-          <div className="t-label-xs mb-16">Cooking for</div>
-          <div className="flex gap-12" style={{ flexWrap: "wrap" }}>
-            {[2, 3, 4].map((n) => (
-              <motion.button
-                key={n}
-                type="button"
-                className={`pill ${state.householdSize === n ? "selected" : ""}`}
-                onClick={() => setState({ ...state, householdSize: n as 2 | 3 | 4 })}
-                whileTap={{ scale: 0.96 }}
-              >
-                <span className="t-data-m" style={{ marginRight: 6 }}>
-                  {n}
-                </span>
-                {n === 2 ? "two" : n === 3 ? "three" : "four"}
-              </motion.button>
-            ))}
-          </div>
-        </div>
+              <section className="intake-panel intake-panel-household">
+                <div className="intake-panel-head">
+                  <span className="intake-panel-title">Cooking for</span>
+                </div>
+                <div className="intake-choice-grid intake-choice-grid-compact">
+                  {householdOptions.map((option) => {
+                    const selected = state.householdSize === option.value;
 
-        <div className="mt-48">
-          <div className="t-label-xs mb-16">Anything off-limits?</div>
-          <div className="flex gap-8" style={{ flexWrap: "wrap" }}>
-            {DIET_FILTERS.map((filter) => {
-              const selected = state.dietFilters.includes(filter);
-              return (
-                <motion.button
-                  key={filter}
-                  type="button"
-                  className={`chip ${selected ? "selected" : ""}`}
-                  onClick={() => toggleDiet(filter)}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {filter}
-                </motion.button>
-              );
-            })}
-          </div>
-          <input
-            className="input mt-16"
-            placeholder="Anything else to avoid? (e.g. cilantro, liver)"
-            value={state.allergyText}
-            onChange={(event) => setState({ ...state, allergyText: event.target.value })}
-          />
-        </div>
+                    return (
+                      <motion.button
+                        key={option.value}
+                        type="button"
+                        className={`intake-choice intake-choice-compact ${selected ? "selected" : ""}`}
+                        aria-pressed={selected}
+                        onClick={() => setState({ ...state, householdSize: option.value })}
+                        whileTap={{ scale: 0.985 }}
+                      >
+                        <span className="intake-choice-value">{option.value}</span>
+                        <span className="intake-choice-detail">{option.label}</span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </section>
 
-        <div className="mt-48">
-          <div className="t-label-xs mb-16">Feeling</div>
-          <div className="flex gap-8" style={{ flexWrap: "wrap" }}>
-            {CUISINES.map((cuisine) => {
-              const selected = state.cuisines.includes(cuisine);
-              return (
-                <motion.button
-                  key={cuisine}
-                  type="button"
-                  className={`chip ${selected ? "selected-saffron" : ""}`}
-                  onClick={() => toggleCuisine(cuisine)}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  {cuisine}
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
+              <section className="intake-panel intake-panel-limits">
+                <div className="intake-panel-head">
+                  <label className="intake-panel-title" htmlFor="allergy-text">
+                    Off-limits
+                  </label>
+                  <span className="t-body-s ink-soft">{restrictionsSummary}</span>
+                </div>
+                <div className="intake-chip-row intake-chip-row-compact">
+                  {DIET_FILTERS.map((filter) => {
+                    const selected = state.dietFilters.includes(filter);
 
-        <p className="t-body-s ink-soft mt-32">
-          Gurkerl minimum order <span className="t-data-m">€39</span>. We&apos;ll show the running total before you
-          check out and suggest neutral add-ons if you&apos;re under.
-        </p>
-        <ErrorNote>{error}</ErrorNote>
-        <div className="mt-32">
-          <button className="btn btn-primary" style={{ width: "100%" }} onClick={submit} disabled={loading || state.cuisines.length === 0}>
-            {loading ? "Finding dinners..." : "Show me dinners"} <ArrowRight size={16} />
-          </button>
+                    return (
+                      <motion.button
+                        key={filter}
+                        type="button"
+                        className={`intake-chip ${selected ? "selected" : ""}`}
+                        aria-pressed={selected}
+                        onClick={() => toggleDiet(filter)}
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        {filter}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+
+                <input
+                  id="allergy-text"
+                  className="input intake-inline-input intake-inline-input-compact"
+                  placeholder="Anything else to avoid?"
+                  value={state.allergyText}
+                  onChange={(event) => setState({ ...state, allergyText: event.target.value })}
+                />
+              </section>
+
+              <section className="intake-panel intake-panel-tastes">
+                <div className="intake-panel-head">
+                  <span className="intake-panel-title">Tastes</span>
+                  <span className="t-body-s ink-soft">{cuisineReady ? `${state.cuisines.length} selected` : "Pick at least one"}</span>
+                </div>
+                <div className="intake-chip-row intake-chip-row-compact">
+                  {CUISINES.map((cuisine) => {
+                    const selected = state.cuisines.includes(cuisine);
+
+                    return (
+                      <motion.button
+                        key={cuisine}
+                        type="button"
+                        className={`intake-chip taste ${selected ? "selected" : ""}`}
+                        aria-pressed={selected}
+                        onClick={() => toggleCuisine(cuisine)}
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        {cuisine}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
+
+            <ErrorNote>{error}</ErrorNote>
+
+            <div className="intake-actions intake-actions-compact">
+              <p className="t-body-s ink-soft" style={{ margin: 0 }}>
+                {cuisineReady ? "€39 minimum handled. We show the total before checkout." : "Pick at least one taste to continue."}
+              </p>
+              <button className="btn btn-primary intake-submit" onClick={submit} disabled={loading || !cuisineReady}>
+                {loading ? "Finding dinners..." : "Show me dinners"} <ArrowRight size={16} />
+              </button>
+            </div>
+          </motion.section>
         </div>
       </div>
     </main>

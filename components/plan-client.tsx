@@ -10,8 +10,14 @@ import type { PlanRecord } from "@/lib/types";
 export function PlanClient({ initialPlan }: { initialPlan: PlanRecord }) {
   const [plan, setPlan] = useState(initialPlan);
   const totalTime = plan.recipes.reduce((sum, recipe) => sum + recipe.timeMinutes, 0);
+  const isRegularOrder = plan.order?.method === "regular";
+  const isGurkerlCart = !isRegularOrder && plan.order?.state === "cart";
   const orderMeta = plan.order
-    ? plan.order.orderId && plan.order.orderId !== "submitted"
+    ? isRegularOrder
+      ? "Details saved"
+      : isGurkerlCart
+      ? "Gurkerl cart"
+      : plan.order.orderId && plan.order.orderId !== "submitted"
       ? `#${plan.order.orderId}`
       : "Gurkerl xKorbly"
     : `/p/${plan.id}`;
@@ -40,9 +46,15 @@ export function PlanClient({ initialPlan }: { initialPlan: PlanRecord }) {
             {plan.order ? (
               <>
                 <span className="badge herb">
-                  <Check size={10} /> Added to cart
+                  <Check size={10} /> {isRegularOrder ? "Details saved" : isGurkerlCart ? "Added to Gurkerl cart" : "Order placed"}
                 </span>
-                <span className="t-data-m" style={{ opacity: 0.7 }}>on Gurkerl xKorbly · delivery {plan.order.slotWindow}</span>
+                <span className="t-data-m" style={{ opacity: 0.7 }}>
+                  {isRegularOrder
+                    ? `Korbly regular customer · ${plan.order.slotWindow}`
+                    : isGurkerlCart
+                    ? `On Gurkerl · ${plan.order.slotWindow}`
+                    : `Gurkerl order · delivery ${plan.order.slotWindow}`}
+                </span>
               </>
             ) : (
               <span className="t-data-m" style={{ opacity: 0.7 }}>Plan saved. Checkout not placed yet.</span>

@@ -12,7 +12,7 @@ export function SiteFooter({ compact = false }: { compact?: boolean }) {
         <div className="col gap-8" style={{ maxWidth: 520 }}>
           <span className="t-body-s ink-soft">Korbly · Wien, Österreich</span>
           <span className="t-body-s ink-soft">
-            Meal plans, real grocery carts, and Gurkerl checkout without storing your login.
+            Meal plans, real grocery carts, and a clean handoff to Gurkerl without storing your login.
           </span>
         </div>
         <nav className="site-footer-links t-body-s ink-soft" aria-label="Legal">

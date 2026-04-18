@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { cartTotalCents, consolidateRecipes } from "@/lib/cart";
-import { normalizeFiller } from "@/lib/gurkerl-normalize";
 import { withHostClient } from "@/lib/mcp";
 import { putPlan } from "@/lib/plan-store";
 import { collectMappedProducts, fetchProductMedia, normalizeRecipeDetail } from "@/lib/recipe-detail";
+import { buildSmartBasketSuggestions } from "@/lib/smart-basket";
 import { CUISINES, DIET_FILTERS, type CandidateRecipe, type IntakeInputs, type PlanRecord } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -61,18 +61,13 @@ export async function POST(request: Request) {
       );
       const cart = consolidateRecipes(recipes, inputs.householdSize);
       const subtotal = cartTotalCents(cart);
-      const fillers =
-        subtotal < 3900
-          ? (
-              await caller.callTool<{ products?: unknown[] }>("get_discounted_items", {
-                limit: 3,
-                sort: "price-asc"
-              })
-            ).products
-              ?.map(normalizeFiller)
-              .filter((item): item is NonNullable<typeof item> => Boolean(item))
-              .slice(0, 3) ?? []
-          : [];
+      const fillers = await buildSmartBasketSuggestions({
+        caller,
+        inputs,
+        needText: inputs.needText,
+        shortfallCents: Math.max(0, 3900 - subtotal),
+        existingProductIds: cart.map((item) => item.productId)
+      });
 
       const id = nanoid(10);
       const now = new Date().toISOString();

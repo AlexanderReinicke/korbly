@@ -97,13 +97,38 @@ export type FillerItem = {
   amount: string;
   priceCents: number;
   selected: boolean;
+  kind: "need" | "topup";
+  reason: string;
+  recommended: boolean;
 };
 
-export type OrderInfo = {
+export type RegularOrderCustomer = {
+  fullName: string;
+  email: string;
+  phone: string;
+  addressLine1: string;
+  postalCode: string;
+  city: string;
+  notes: string;
+};
+
+export type GurkerlOrderInfo = {
+  state?: "cart" | "submitted";
   orderId: string;
   slotWindow: string;
   placedAt: string;
 };
+
+export type RegularOrderInfo = {
+  method: "regular";
+  state?: "details";
+  orderId: string;
+  slotWindow: string;
+  placedAt: string;
+  customer: RegularOrderCustomer;
+};
+
+export type OrderInfo = (GurkerlOrderInfo & { method?: "gurkerl" }) | RegularOrderInfo;
 
 export type PlanRecord = {
   id: string;

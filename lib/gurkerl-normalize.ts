@@ -102,7 +102,10 @@ export function normalizeFiller(raw: unknown): FillerItem | null {
     link: productLink(productId),
     amount: String(item.textualAmount ?? item.amount ?? ""),
     priceCents: centsFromEuro(prices.salePrice ?? prices.originalPrice ?? item.price),
-    selected: false
+    selected: false,
+    kind: "topup",
+    reason: "Useful price-conscious add-on from current deals.",
+    recommended: false
   };
 }
 

@@ -1,18 +1,20 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Basket, Knife, Plate } from "@/components/icons";
+import { ArrowRight, Basket, Check, Knife, Plate } from "@/components/icons";
 import { ErrorNote, MiniNav, RecipeImage, money } from "@/components/shared";
-import type { FillerItem, PlanRecord } from "@/lib/types";
+import type { CartItem, FillerItem, PlanRecord } from "@/lib/types";
 
 export function CartClient({ initialPlanId }: { initialPlanId: string | null }) {
   const router = useRouter();
   const [planId, setPlanId] = useState(initialPlanId);
   const [plan, setPlan] = useState<PlanRecord | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [showAllGroceries, setShowAllGroceries] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -20,6 +22,7 @@ export function CartClient({ initialPlanId }: { initialPlanId: string | null }) 
   useEffect(() => {
     const id = initialPlanId ?? sessionStorage.getItem("korbly.planId");
     setPlanId(id);
+    setShowAllGroceries(false);
     if (!id) {
       setLoading(false);
       setError("No plan ID found. Build a cart from three dinners first.");
@@ -69,7 +72,7 @@ export function CartClient({ initialPlanId }: { initialPlanId: string | null }) 
         <MiniNav step="cart" />
         <div className="container" style={{ padding: "64px 32px" }}>
           <div className="skeleton" style={{ height: 72, maxWidth: 620, borderRadius: 12 }} />
-          <div className="skeleton mt-32" style={{ height: 360, borderRadius: 12 }} />
+          <div className="skeleton mt-32" style={{ height: 420, borderRadius: 12 }} />
         </div>
       </main>
     );
@@ -94,178 +97,175 @@ export function CartClient({ initialPlanId }: { initialPlanId: string | null }) 
 
   const met = plan.totalCents >= 3900;
   const pct = Math.min(100, (plan.totalCents / 3900) * 100);
+  const selectedExtras = plan.fillers.filter((item) => item.selected);
+  const sharedGroceries = plan.cart.filter((item) => item.recipes.length > 1);
+  const groceryLines = plan.cart.length + selectedExtras.length;
+  const shortfallCents = Math.max(0, 3900 - plan.totalCents);
+  const groceryPreviewCount = 5;
+  const groceryEntries = [
+    ...plan.cart.map((item) => ({ type: "cart" as const, item })),
+    ...selectedExtras.map((item) => ({ type: "extra" as const, item }))
+  ];
+  const visibleGroceries = showAllGroceries ? groceryEntries : groceryEntries.slice(0, groceryPreviewCount);
+  const hiddenGroceriesCount = Math.max(0, groceryEntries.length - groceryPreviewCount);
 
   return (
-    <main style={{ background: "var(--paper)", minHeight: "100vh" }}>
+    <main className="paper-grain" style={{ minHeight: "100vh" }}>
       <MiniNav step="cart" />
-      <div className="container" style={{ padding: "64px 32px 96px" }}>
-        <span className="t-label-xs ink-paprika">Step 3 of 3</span>
-        <h1 className="t-display-l mt-12" style={{ margin: 0 }}>
-          Your <i>three dinners,</i> one cart.
-        </h1>
-        <p className="t-body-m ink-soft mt-12">Consolidated into real Gurkerl SKUs. No duplicate parsley.</p>
-
-        <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16, marginTop: 40 }}>
-          {plan.recipes.map((recipe) => (
-            <div key={recipe.recipeId} className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-              <div className="photo-ph" style={{ width: 64, height: 64, flexShrink: 0, borderRadius: 8 }}>
-                <RecipeImage src={recipe.image} alt={recipe.title} icon={<Plate size={34} />} />
+      <div className="container" style={{ padding: "56px 32px 96px" }}>
+        <div className="basket-shell">
+          <section className="basket-main">
+            <span className="t-label-xs ink-paprika">Step 3 of 3</span>
+            <h1 className="t-display-l mt-12" style={{ margin: 0, maxWidth: 760 }}>
+              Your <i>three dinners,</i> one smarter cart.
+            </h1>
+            <section className="basket-section basket-section-first mt-32">
+              <div className="basket-section-head">
+                <h2 className="t-display-m" style={{ margin: 0 }}>
+                  Selected dinners
+                </h2>
+                <div className="t-body-s ink-soft">{plan.recipes.length} selected</div>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="t-display-s" style={{ lineHeight: 1.1, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {recipe.title}
-                </div>
-                <div className="t-body-s ink-soft mt-4">
-                  {recipe.ingredients.length} items · {recipe.timeMinutes} min
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 48 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
-            <span className="t-label-xs">
-              Gurkerl minimum · <span className="t-data-m" style={{ textTransform: "none", letterSpacing: 0 }}>€39.00</span>
-            </span>
-            <span className="t-data-m" style={{ color: met ? "var(--herb)" : "var(--paprika)" }}>
-              {money(plan.totalCents)} / €39.00
-            </span>
-          </div>
-          <div className="progress-track">
-            <div className={`progress-fill ${met ? "met" : ""}`} style={{ width: `${pct}%` }} />
-          </div>
-        </div>
-
-        <div className="card mt-32" style={{ padding: 20 }}>
-          <div className="cart-table-wrap">
-            <table className="cart-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 60 }}></th>
-                  <th>Product</th>
-                  <th>Amount</th>
-                  <th>Qty needed</th>
-                  <th>Used in</th>
-                  <th className="right">Unit</th>
-                  <th className="right">Subtotal</th>
-                  <th style={{ width: 48 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {plan.cart.map((item) => (
-                  <tr key={item.productId}>
-                    <td>
-                      <div className="ill-circle">
-                        {item.image ? <img src={item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Basket size={20} />}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="t-body-m" style={{ fontWeight: 500 }}>{item.productName}</div>
-                      <div className="t-body-s ink-soft">{item.brand || "Gurkerl"}</div>
-                    </td>
-                    <td className="t-body-s ink-soft">{item.amount}</td>
-                    <td className="t-data-m">{item.qtyNeeded}</td>
-                    <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {item.recipes.map((recipe) => (
-                          <span key={recipe} className="badge" style={{ fontSize: 10, padding: "3px 8px" }}>
-                            {recipe.split(" ").slice(0, 2).join(" ")}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="right t-data-m">{money(item.unitPriceCents)}</td>
-                    <td className="right t-data-m" style={{ fontWeight: 500 }}>{money(item.subtotalCents)}</td>
-                    <td className="right">
-                      <a className="ink-whisper" href={item.link} target="_blank" rel="noreferrer" aria-label={`Open ${item.productName} on Gurkerl`}>
-                        ↗
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-                {plan.fillers.filter((item) => item.selected).map((item) => (
-                  <tr key={`filler-${item.productId}`} style={{ background: "var(--paper)" }}>
-                    <td>
-                      <div className="ill-circle">
-                        {item.image ? <img src={item.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <Basket size={20} />}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="t-body-m" style={{ fontWeight: 500 }}>{item.productName}</div>
-                      <div className="t-body-s ink-soft">added by you</div>
-                    </td>
-                    <td className="t-body-s ink-soft">{item.amount}</td>
-                    <td className="t-data-m">1</td>
-                    <td><span className="t-body-s ink-whisper">-</span></td>
-                    <td className="right t-data-m">{money(item.priceCents)}</td>
-                    <td className="right t-data-m" style={{ fontWeight: 500 }}>{money(item.priceCents)}</td>
-                    <td className="right">
-                      <button style={{ background: "none", border: 0, color: "var(--ink-soft)", cursor: "pointer" }} onClick={() => toggleFiller(item)}>
-                        x
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                <tr>
-                  <td colSpan={5} style={{ borderBottom: "none", paddingTop: 24 }}>
-                    <span className="t-label-xs ink-soft">Total · {plan.cart.length + plan.fillers.filter((item) => item.selected).length} items</span>
-                  </td>
-                  <td className="right" style={{ borderBottom: "none", paddingTop: 24 }}>
-                    <span className="t-label-xs ink-soft">3 dinners</span>
-                  </td>
-                  <td className="right" style={{ borderBottom: "none", paddingTop: 24 }}>
-                    <span className="t-data-l" style={{ color: met ? "var(--herb)" : "var(--ink)" }}>{money(plan.totalCents)}</span>
-                  </td>
-                  <td style={{ borderBottom: "none" }}></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {!met && (
-          <div className="mt-48">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, flexWrap: "wrap" }}>
-              <div className="t-display-s">Add to reach €39</div>
-              <div className="t-body-s ink-soft">
-                You&apos;re <span className="t-data-m">{money(3900 - plan.totalCents)}</span> short. Gurkerl requires a €39 minimum order.
-              </div>
-            </div>
-            <div className="mobile-stack" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginTop: 16 }}>
-              {plan.fillers.map((item) => (
-                <div key={item.productId} className="card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
-                  <div className="photo-ph" style={{ width: 52, height: 52, borderRadius: 8, flexShrink: 0 }}>
-                    <RecipeImage src={item.image} alt={item.productName} icon={<Basket size={28} />} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="t-body-m" style={{ fontWeight: 500 }}>{item.productName}</div>
-                    <div className="t-body-s ink-soft">
-                      {item.amount} · <span className="t-data-m">{money(item.priceCents)}</span>
+              <div className="basket-recipe-strip mt-20">
+                {plan.recipes.map((recipe, index) => (
+                  <motion.div
+                    key={recipe.recipeId}
+                    className="basket-recipe-tile"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05, duration: 0.28 }}
+                  >
+                    <div className="photo-ph basket-recipe-media">
+                      <RecipeImage src={recipe.image} alt={recipe.title} icon={<Plate size={30} />} />
                     </div>
-                  </div>
-                  <button className={`btn ${item.selected ? "btn-outline" : "btn-primary"}`} style={{ padding: "8px 14px", fontSize: 13 }} onClick={() => toggleFiller(item)} disabled={updating === item.productId}>
-                    {item.selected ? "Added" : "Add"}
+                    <div style={{ minWidth: 0 }}>
+                      <div className="t-label-xs ink-soft">Dinner {String(index + 1).padStart(2, "0")}</div>
+                      <div className="t-body-m basket-recipe-title mt-6" style={{ fontWeight: 500 }}>
+                        {recipe.title}
+                      </div>
+                      <div className="basket-recipe-meta mt-8">
+                        <span className="t-body-s ink-soft">{recipe.ingredients.length} items</span>
+                        <span className="t-body-s ink-soft">{recipe.timeMinutes} min</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+
+            <section className="basket-section mt-48">
+              <div className="basket-section-head">
+                <h2 className="t-display-m" style={{ margin: 0 }}>
+                  Groceries
+                </h2>
+                <div className="t-body-s ink-soft">
+                  {sharedGroceries.length ? `${groceryLines} lines · ${sharedGroceries.length} shared items merged` : `${groceryLines} lines ready`}
+                </div>
+              </div>
+              <div className="basket-list mt-20" id="groceries-list">
+                {visibleGroceries.map((entry) =>
+                  entry.type === "cart" ? (
+                    <CartLineRow key={entry.item.productId} item={entry.item} />
+                  ) : (
+                    <SelectedExtraRow
+                      key={`extra-${entry.item.productId}`}
+                      item={entry.item}
+                      onToggle={() => toggleFiller(entry.item)}
+                      busy={updating === entry.item.productId}
+                    />
+                  )
+                )}
+              </div>
+              {hiddenGroceriesCount > 0 ? (
+                <div className="mt-20">
+                  <button
+                    className="btn btn-ghost"
+                    type="button"
+                    onClick={() => setShowAllGroceries((current) => !current)}
+                    aria-controls="groceries-list"
+                    aria-expanded={showAllGroceries}
+                  >
+                    {showAllGroceries ? `Show fewer groceries` : `Show all ${groceryLines} groceries`}
                   </button>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              ) : null}
+            </section>
 
-        <ErrorNote>{error}</ErrorNote>
-        <div className="mt-64">
-          <p className="t-body-s ink-soft mb-16" style={{ textAlign: "right" }}>
-            We&apos;ll ask for your Gurkerl login next. We never store your credentials.
-          </p>
-          <div className="flex gap-16" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
-            <Link className="btn btn-ghost" href="/plan/new/pick">
-              ← Back to dinners
-            </Link>
-            <button className="btn btn-primary" disabled={!met} onClick={() => setCheckoutOpen(true)}>
-              Place order with Gurkerl <ArrowRight size={16} />
-            </button>
-          </div>
+            {plan.fillers.length > 0 ? (
+              <section className="basket-section mt-48">
+                <div className="basket-section-head basket-section-head-support">
+                  <div className="basket-section-copy">
+                    <span className="t-label-xs ink-paprika">Support the cart</span>
+                    <h2 className="t-display-m mt-8" style={{ margin: 0 }}>
+                      {met ? "Useful extras" : "Suggested add-ons"}
+                    </h2>
+                  </div>
+                  <p className="t-body-s ink-soft basket-section-note" style={{ margin: 0 }}>
+                    {met
+                      ? "Optional picks based on your brief and current deals."
+                      : `Pick a few items to clear the €39 minimum. You are ${money(shortfallCents)} short.`}
+                  </p>
+                </div>
+                <div className="basket-suggestion-grid mt-20">
+                  {plan.fillers.map((item) => (
+                    <SuggestionCard
+                      key={item.productId}
+                      item={item}
+                      busy={updating === item.productId}
+                      onToggle={() => toggleFiller(item)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <ErrorNote>{error}</ErrorNote>
+          </section>
+
+          <aside className="basket-aside">
+            <div className="basket-summary-card">
+              <span className={`badge ${met ? "herb" : "outline"}`}>
+                {met ? <Check size={12} /> : null}
+                {met ? "Ready to add" : "Needs a few extras"}
+              </span>
+              <div className="t-label-xs ink-soft mt-20">Current cart</div>
+              <div className="t-display-l mt-8" style={{ margin: "8px 0 0" }}>
+                {money(plan.totalCents)}
+              </div>
+              <div className="t-body-s ink-soft mt-8">
+                {groceryLines} lines · {plan.recipes.length} dinners · live Gurkerl pricing
+              </div>
+
+              <div style={{ marginTop: 24 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+                  <span className="t-label-xs">
+                    Minimum · <span className="t-data-m" style={{ textTransform: "none", letterSpacing: 0 }}>€39.00</span>
+                  </span>
+                  <span className="t-data-m" style={{ color: met ? "var(--herb)" : "var(--paprika)" }}>
+                    {money(plan.totalCents)} / €39.00
+                  </span>
+                </div>
+                <div className="progress-track">
+                  <div className={`progress-fill ${met ? "met" : ""}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+
+              <p className="t-body-s ink-soft mt-24" style={{ marginBottom: 0 }}>
+                We&apos;ll sign in once, add everything to your Gurkerl cart, and you finish delivery and payment there.
+              </p>
+
+              <div className="mt-24">
+                <button className="btn btn-primary" disabled={!met} onClick={() => setCheckoutOpen(true)} style={{ width: "100%" }}>
+                  Add to Gurkerl cart <ArrowRight size={16} />
+                </button>
+              </div>
+              <div className="mt-12">
+                <Link className="btn btn-ghost" href="/plan/new/pick" style={{ width: "100%" }}>
+                  Back to dinners
+                </Link>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
       {checkoutOpen && planId ? (
@@ -275,31 +275,182 @@ export function CartClient({ initialPlanId }: { initialPlanId: string | null }) 
   );
 }
 
+function CartLineRow({ item }: { item: CartItem }) {
+  const dinnerLabel = formatDinnerLabel(item.recipes);
+  return (
+    <div className="basket-row">
+      <div className="basket-row-main basket-row-main-with-photo">
+        <div className="photo-ph basket-row-photo">
+          <RecipeImage src={item.image} alt={item.productName} icon={<Basket size={24} />} />
+        </div>
+        <div className="basket-row-copy">
+          <div className="t-body-m basket-row-title" style={{ fontWeight: 500 }}>
+            {item.productName}
+          </div>
+          <div className="t-body-s ink-soft mt-6">
+            {[item.brand || "Gurkerl", item.amount, item.recipes.length > 1 ? `shared across ${item.recipes.length} dinners` : null]
+              .filter(Boolean)
+              .join(" · ")}
+          </div>
+          {dinnerLabel ? <div className="basket-row-usage mt-6">{dinnerLabel}</div> : null}
+        </div>
+      </div>
+      <div className="basket-row-side">
+        <div className="t-data-m">{money(item.subtotalCents)}</div>
+        <a className="basket-row-link" href={item.link} target="_blank" rel="noreferrer">
+          Open on Gurkerl
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function SelectedExtraRow({ item, onToggle, busy }: { item: FillerItem; onToggle: () => void; busy: boolean }) {
+  const meta = withFallbackMeta(item);
+  return (
+    <div className="basket-row">
+      <div className="basket-row-main basket-row-main-with-photo">
+        <div className="photo-ph basket-row-photo">
+          <RecipeImage src={item.image} alt={item.productName} icon={<Basket size={24} />} />
+        </div>
+        <div className="basket-row-copy">
+          <div className="t-body-m basket-row-title" style={{ fontWeight: 500 }}>
+            {item.productName}
+          </div>
+          <div className="t-body-s ink-soft mt-6">
+            {(item.amount || "1 item") + " · " + (meta.kind === "need" ? "from your note" : "optional extra")}
+          </div>
+        </div>
+      </div>
+      <div className="basket-row-side">
+        <div className="t-data-m">{money(item.priceCents)}</div>
+        <button className="basket-row-link" type="button" onClick={onToggle} disabled={busy}>
+          {busy ? "Updating..." : "Remove"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SuggestionCard({
+  item,
+  busy,
+  onToggle
+}: {
+  item: FillerItem;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  const meta = withFallbackMeta(item);
+  return (
+    <motion.div
+      className={`basket-suggestion-card ${item.selected ? "selected" : ""}`}
+      initial={false}
+      animate={{ y: item.selected ? -2 : 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      <div className="basket-suggestion-top">
+        <div className="basket-suggestion-badges">
+          <span className={`badge ${meta.kind === "need" ? "beet" : ""}`}>{meta.kind === "need" ? "From your note" : "Current deal"}</span>
+          {meta.recommended ? <span className="badge herb">Best match</span> : null}
+        </div>
+        <div className="t-data-m basket-suggestion-price">{money(item.priceCents)}</div>
+      </div>
+      <div className="basket-suggestion-content">
+        <div className="basket-suggestion-product">
+          <div className="photo-ph basket-suggestion-media">
+            <RecipeImage src={item.image} alt={item.productName} icon={<Basket size={26} />} />
+          </div>
+          <div className="basket-suggestion-copy">
+            <div className="t-body-m basket-suggestion-title" style={{ fontWeight: 500 }}>
+              {item.productName}
+            </div>
+            <div className="t-body-s ink-soft mt-4">{item.amount || "1 item"}</div>
+          </div>
+        </div>
+        <p className="t-body-s ink-soft basket-suggestion-reason">{meta.reason}</p>
+      </div>
+      <div className="basket-suggestion-action">
+        <button className={`btn ${item.selected ? "btn-outline" : "btn-primary"}`} style={{ width: "100%" }} onClick={onToggle} disabled={busy}>
+          {busy ? "Updating..." : item.selected ? "Added" : "Add to cart"}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+function shortLabel(value: string): string {
+  const words = value.split(" ").filter(Boolean);
+  return words.slice(0, 3).join(" ");
+}
+
+function formatDinnerLabel(recipes: string[]): string {
+  if (!recipes.length) return "";
+  return `Used in ${recipes.map(shortLabel).join(" · ")}`;
+}
+
+function withFallbackMeta(item: FillerItem): Pick<FillerItem, "kind" | "reason" | "recommended"> {
+  return {
+    kind: item.kind ?? "topup",
+    reason: item.reason || "Useful cart support item.",
+    recommended: Boolean(item.recommended)
+  };
+}
+
+type CheckoutMode = "regular" | "gurkerl";
+
 function CheckoutModal({ planId, onClose, onSuccess }: { planId: string; onClose: () => void; onSuccess: () => void }) {
+  const [mode, setMode] = useState<CheckoutMode>("gurkerl");
   const [showPw, setShowPw] = useState(false);
-  const [showEmail, setShowEmail] = useState(false);
-  const [email, setEmail] = useState("");
+  const [gurkerlEmail, setGurkerlEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [emailMe, setEmailMe] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [regularEmail, setRegularEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [city, setCity] = useState("");
+  const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const canSubmit = email.includes("@") && password.length > 0;
+  const gurkerlReady = gurkerlEmail.includes("@") && password.length > 0;
+  const regularReady =
+    fullName.trim().length > 1 &&
+    regularEmail.includes("@") &&
+    phone.trim().length > 5 &&
+    addressLine1.trim().length > 4 &&
+    postalCode.trim().length > 2 &&
+    city.trim().length > 1;
+  const canSubmit = mode === "gurkerl" ? gurkerlReady : regularReady;
 
   async function submit() {
     if (!canSubmit || submitting) return;
     setSubmitting(true);
     setError("");
     try {
+      const payload =
+        mode === "gurkerl"
+          ? { method: "gurkerl", email: gurkerlEmail.trim(), password }
+          : {
+              method: "regular",
+              fullName: fullName.trim(),
+              email: regularEmail.trim(),
+              phone: phone.trim(),
+              addressLine1: addressLine1.trim(),
+              postalCode: postalCode.trim(),
+              city: city.trim(),
+              notes: notes.trim()
+            };
       const response = await fetch(`/api/plan/${planId}/order`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password, emailMe })
+        body: JSON.stringify(payload)
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not place order.");
+      if (!response.ok) throw new Error(data.error || (mode === "gurkerl" ? "Could not add the cart." : "Could not save details."));
       onSuccess();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not place order.");
+      setError(err instanceof Error ? err.message : mode === "gurkerl" ? "Could not add the cart." : "Could not save details.");
     } finally {
       setSubmitting(false);
     }
@@ -308,36 +459,166 @@ function CheckoutModal({ planId, onClose, onSuccess }: { planId: string; onClose
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <motion.div className="modal" onClick={(event) => event.stopPropagation()} initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }}>
-        <span className="t-label-xs ink-soft">Secure checkout</span>
-        <h2 className="t-display-m mt-8" style={{ margin: 0 }}>
-          One step <i>left.</i>
-        </h2>
-        <p className="t-body-m ink-soft mt-16">We&apos;ll use your Gurkerl login once to place this order, then forget it.</p>
-        <div className="mt-24">
-          <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>Gurkerl email</label>
-          <input className="input" type="email" placeholder="you@email.at" value={email} onChange={(event) => setEmail(event.target.value)} />
+        <div className="checkout-modal-top">
+          <span className="t-label-xs ink-soft">{mode === "gurkerl" ? "Add to cart" : "Save details"}</span>
+          <h2 className="t-display-s mt-8" style={{ margin: 0 }}>
+            {mode === "gurkerl" ? (
+              <>
+                Add this cart to <i>Gurkerl.</i>
+              </>
+            ) : (
+              <>
+                Save your <i>details.</i>
+              </>
+            )}
+          </h2>
         </div>
-        <div className="mt-16">
-          <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>Gurkerl password</label>
-          <div style={{ position: "relative" }}>
-            <input className="input" type={showPw ? "text" : "password"} placeholder="password" value={password} onChange={(event) => setPassword(event.target.value)} style={{ paddingRight: 56 }} />
-            <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: 0, color: "var(--ink-soft)", cursor: "pointer", fontSize: 12 }}>
-              {showPw ? "hide" : "show"}
-            </button>
-          </div>
+        <div className="checkout-mode-switch mt-20" role="tablist" aria-label="Checkout type">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "regular"}
+            className={`checkout-mode-option ${mode === "regular" ? "selected" : ""}`}
+            onClick={() => {
+              setMode("regular");
+              setError("");
+            }}
+          >
+            {mode === "regular" ? (
+              <motion.span
+                className="checkout-mode-indicator"
+                layoutId="checkout-mode-indicator"
+                transition={{ type: "spring", duration: 0.42, bounce: 0.16 }}
+              />
+            ) : null}
+            <span className="checkout-mode-label">Regular</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "gurkerl"}
+            aria-label="Gurkerl"
+            className={`checkout-mode-option ${mode === "gurkerl" ? "selected" : ""}`}
+            onClick={() => {
+              setMode("gurkerl");
+              setError("");
+            }}
+          >
+            {mode === "gurkerl" ? (
+              <motion.span
+                className="checkout-mode-indicator"
+                layoutId="checkout-mode-indicator"
+                transition={{ type: "spring", duration: 0.42, bounce: 0.16 }}
+              />
+            ) : null}
+            <Image
+              className="checkout-mode-logo"
+              src="/gurkerl-logo.svg"
+              alt="Gurkerl.at"
+              width={199}
+              height={106}
+            />
+          </button>
         </div>
-        <div className="mt-16">
-          {!showEmail ? (
-            <button type="button" onClick={() => setShowEmail(true)} className="t-body-s ink-soft" style={{ background: "none", border: 0, cursor: "pointer", padding: 0, borderBottom: "1px solid var(--rule-strong)" }}>
-              Email me this plan →
-            </button>
-          ) : (
-            <div>
-              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>Where should we send it?</label>
-              <input className="input" type="email" placeholder="you@email.at" value={emailMe} onChange={(event) => setEmailMe(event.target.value)} />
+        <p className="t-body-s ink-soft mt-16 checkout-modal-copy">
+          {mode === "gurkerl"
+            ? "We add the items to your Gurkerl cart. You continue there to choose delivery and pay."
+            : "We save your contact and delivery details first. Korbly follows up before anything is placed."}
+        </p>
+        {mode === "gurkerl" ? (
+          <>
+            <div className="mt-24">
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                Gurkerl email
+              </label>
+              <input
+                className="input"
+                type="email"
+                placeholder="you@email.at"
+                value={gurkerlEmail}
+                onChange={(event) => setGurkerlEmail(event.target.value)}
+              />
             </div>
-          )}
-        </div>
+            <div className="mt-16">
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                Gurkerl password
+              </label>
+              <div style={{ position: "relative" }}>
+                <input
+                  className="input"
+                  type={showPw ? "text" : "password"}
+                  placeholder="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  style={{ paddingRight: 56 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: 0, color: "var(--ink-soft)", cursor: "pointer", fontSize: 12 }}
+                >
+                  {showPw ? "hide" : "show"}
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="checkout-form-grid mt-24">
+            <div>
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                Full name
+              </label>
+              <input className="input" type="text" placeholder="Alex Example" value={fullName} onChange={(event) => setFullName(event.target.value)} />
+            </div>
+            <div>
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                Email
+              </label>
+              <input className="input" type="email" placeholder="you@email.at" value={regularEmail} onChange={(event) => setRegularEmail(event.target.value)} />
+            </div>
+            <div>
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                Phone
+              </label>
+              <input className="input" type="tel" placeholder="+43 660 1234567" value={phone} onChange={(event) => setPhone(event.target.value)} />
+            </div>
+            <div className="checkout-form-span-2">
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                Street address
+              </label>
+              <input
+                className="input"
+                type="text"
+                placeholder="Praterstrasse 10"
+                value={addressLine1}
+                onChange={(event) => setAddressLine1(event.target.value)}
+              />
+            </div>
+            <div>
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                Postal code
+              </label>
+              <input className="input" type="text" placeholder="1020" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} />
+            </div>
+            <div>
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                City
+              </label>
+              <input className="input" type="text" placeholder="Vienna" value={city} onChange={(event) => setCity(event.target.value)} />
+            </div>
+            <div className="checkout-form-span-2">
+              <label className="t-label-xs ink-soft" style={{ display: "block", marginBottom: 8 }}>
+                Delivery notes
+              </label>
+              <textarea
+                className="textarea"
+                placeholder="Doorbell name, stair info, or anything we should know."
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </div>
+          </div>
+        )}
         <ErrorNote>{error}</ErrorNote>
         <button className="btn btn-primary mt-24" style={{ width: "100%" }} disabled={!canSubmit || submitting} onClick={submit}>
           {submitting ? (
@@ -345,14 +626,14 @@ function CheckoutModal({ planId, onClose, onSuccess }: { planId: string; onClose
               <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}>
                 <Knife size={18} />
               </motion.span>
-              Placing order...
+              {mode === "gurkerl" ? "Adding to cart..." : "Saving details..."}
             </span>
           ) : (
-            "Place order"
+            mode === "gurkerl" ? "Add to Gurkerl cart" : "Save details"
           )}
         </button>
         <div className="t-label-xs ink-soft mt-16" style={{ textAlign: "center" }}>
-          Secured by Gurkerl · Not stored by Korbly
+          {mode === "gurkerl" ? "Korbly does not store your Gurkerl login" : "Saved to your Korbly plan"}
         </div>
       </motion.div>
     </div>

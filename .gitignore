@@ -14,3 +14,4 @@ slug-*.json
 tool-schemas.json
 tool-schemas.txt
 tsconfig.tsbuildinfo
+.vercel

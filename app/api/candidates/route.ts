@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { aiDietFilter } from "@/lib/diet-filter";
 import { normalizeCandidate } from "@/lib/gurkerl-normalize";
+import { buildRecipeSearchQueries } from "@/lib/intake-query";
 import { withHostClient } from "@/lib/mcp";
 import { CUISINES, DIET_FILTERS, type CandidateRecipe, type IntakeInputs } from "@/lib/types";
 
@@ -19,7 +20,7 @@ const IntakeSchema = z.object({
 export async function POST(request: Request) {
   try {
     const inputs = IntakeSchema.parse(await request.json()) satisfies IntakeInputs;
-    const queries = buildQueries(inputs);
+    const queries = buildRecipeSearchQueries(inputs);
     const candidates = await withHostClient(async (caller) => {
       const responses: Array<{ query: string; response: { data?: unknown[]; results?: unknown[] } }> = [];
       for (const query of queries) {
@@ -53,20 +54,6 @@ export async function POST(request: Request) {
   }
 }
 
-function buildQueries(inputs: IntakeInputs): string[] {
-  const cuisine = inputs.cuisines.join(", ");
-  const diet = inputs.dietFilters.length ? `${inputs.dietFilters.join(", ")} ` : "";
-  const need = normalizeNeedText(inputs.needText);
-  const needSuffix = need ? ` mit diesen Wünschen: ${need}` : "";
-  return [
-    `${diet}herzhaftes Abendessen ${cuisine} Gurkerl Küche für ${inputs.householdSize} Personen${needSuffix}`,
-    `${diet}schnelles weeknight dinner ${cuisine} authentisch einfach${need ? ` ${need}` : ""}`,
-    need
-      ? `${diet}${need} ${cuisine} Rezepte einfach alltagstauglich`
-      : `${diet}drei gemütliche Dinner Rezepte ${cuisine} saisonal`
-  ];
-}
-
 function dedupe(candidates: CandidateRecipe[]): CandidateRecipe[] {
   const seen = new Set<number>();
   const out: CandidateRecipe[] = [];
@@ -76,8 +63,4 @@ function dedupe(candidates: CandidateRecipe[]): CandidateRecipe[] {
     out.push(candidate);
   }
   return out;
-}
-
-function normalizeNeedText(value: string): string {
-  return value.replace(/\s+/g, " ").trim().slice(0, 160);
 }
