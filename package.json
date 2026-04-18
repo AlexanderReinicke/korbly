@@ -1,0 +1,41 @@
+{
+  "name": "korbly",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "test": "npm run test:unit",
+    "test:unit": "tsx --test tests/*.test.ts",
+    "smoke:mcp": "node test-gurkerl.mjs",
+    "test:creds": "node test-per-request-creds.mjs",
+    "list-tools": "node test-gurkerl.mjs list",
+    "inspect": "npx -y @modelcontextprotocol/inspector npx -y mcp-remote https://mcp.gurkerl.at/mcp/ --header \"rhl-email: ${RHL_EMAIL}\" --header \"rhl-pass: ${RHL_PASS}\""
+  },
+  "dependencies": {
+    "@ai-sdk/gateway": "^3.0.104",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@vercel/kv": "^3.0.0",
+    "ai": "^6.0.168",
+    "framer-motion": "^12.38.0",
+    "mcp-remote": "^0.1.38",
+    "nanoid": "^5.1.9",
+    "next": "^16.2.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "resend": "^6.12.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.4",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}
