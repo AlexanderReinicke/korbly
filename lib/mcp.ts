@@ -1,8 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 const MCP_URL = "https://mcp.gurkerl.at/mcp";
 const REQUEST_TIMEOUT_MS = 150_000;
@@ -16,23 +14,19 @@ type Credentials = {
   password: string;
 };
 
-function proxyPath(): string {
-  return join(process.cwd(), "node_modules", "mcp-remote", "dist", "proxy.js");
+type RemoteTransport = StreamableHTTPClientTransport | SSEClientTransport;
+
+function requestHeaders(credentials: Credentials): HeadersInit {
+  return {
+    "rhl-email": credentials.email,
+    "rhl-pass": credentials.password
+  };
 }
 
-function minimalChildEnv(configDir: string): Record<string, string> {
-  const allowed = ["HOME", "PATH", "SHELL", "TMPDIR", "USER", "LOGNAME", "LANG", "LC_ALL", "npm_config_cache"];
-  const env: Record<string, string> = {};
-  for (const key of allowed) {
-    if (process.env[key]) env[key] = process.env[key];
+function debugLog(label: string, message: string): void {
+  if (process.env.MCP_DEBUG === "1") {
+    process.stderr.write(`[${label}:mcp] ${message}\n`);
   }
-  env.MCP_REMOTE_CONFIG_DIR = configDir;
-  env.NO_COLOR = "1";
-  return env;
-}
-
-function redact(text: string, secrets: string[]): string {
-  return secrets.filter(Boolean).reduce((out, secret) => out.split(secret).join("[redacted]"), text);
 }
 
 function textFromToolResult(result: { content?: Array<{ type: string; text?: string }>; isError?: boolean }): string {
@@ -54,30 +48,25 @@ export async function withMcpClient<T>(
   credentials: Credentials,
   fn: (caller: McpToolCaller) => Promise<T>
 ): Promise<T> {
-  const configDir = await mkdtemp(join(tmpdir(), `korbly-mcp-${label}-`));
-  const client = new Client({ name: `korbly-${label}`, version: "0.1.0" }, { capabilities: {} });
-  const transport = new StdioClientTransport({
-    command: process.execPath,
-    args: [
-      proxyPath(),
-      MCP_URL,
-      "--header",
-      `rhl-email: ${credentials.email}`,
-      "--header",
-      `rhl-pass: ${credentials.password}`
-    ],
-    env: minimalChildEnv(configDir),
-    stderr: "pipe"
-  });
-
-  transport.stderr?.on("data", (chunk) => {
-    if (process.env.MCP_DEBUG === "1") {
-      process.stderr.write(`[${label}:mcp-remote] ${redact(String(chunk), [credentials.email, credentials.password])}`);
-    }
-  });
+  let client = new Client({ name: `korbly-${label}`, version: "0.1.0" }, { capabilities: {} });
+  let transport: RemoteTransport | null = null;
 
   try {
-    await client.connect(transport, { timeout: REQUEST_TIMEOUT_MS });
+    const url = new URL(MCP_URL);
+    const requestInit = { headers: requestHeaders(credentials) };
+
+    try {
+      transport = new StreamableHTTPClientTransport(url, { requestInit });
+      await client.connect(transport, { timeout: REQUEST_TIMEOUT_MS });
+    } catch (streamableError) {
+      debugLog(label, `Streamable HTTP transport failed, falling back to SSE: ${String(streamableError)}`);
+      await transport?.close().catch(() => undefined);
+
+      client = new Client({ name: `korbly-${label}`, version: "0.1.0" }, { capabilities: {} });
+      transport = new SSEClientTransport(url, { requestInit });
+      await client.connect(transport, { timeout: REQUEST_TIMEOUT_MS });
+    }
+
     const caller: McpToolCaller = {
       async callTool<TTool = unknown>(name: string, args: Record<string, unknown>) {
         const result = (await client.callTool({ name, arguments: args }, undefined, {
@@ -92,13 +81,16 @@ export async function withMcpClient<T>(
       }
     };
     return await fn(caller);
+  } catch (error) {
+    debugLog(label, `MCP request failed: ${String(error)}`);
+    throw error;
   } finally {
+    await transport?.close().catch(() => undefined);
     try {
       await client.close();
     } catch {
-      // Closing best-effort; the temp config cleanup below is the important part.
+      // Closing best-effort.
     }
-    await rm(configDir, { recursive: true, force: true });
   }
 }
 
