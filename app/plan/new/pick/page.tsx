@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Clock, Plate } from "@/components/icons";
 import { ErrorNote, MiniNav, RecipeImage } from "@/components/shared";
+import { writeCachedPlan } from "@/lib/plan-cache";
 import type { CandidateRecipe, IntakeInputs } from "@/lib/types";
 
 const fallbackInputs: IntakeInputs = {
@@ -80,6 +81,7 @@ export default function PickPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not build cart.");
       sessionStorage.setItem("korbly.planId", data.planId);
+      if (data.plan) writeCachedPlan(data.plan);
       router.push(`/plan/new/cart?planId=${data.planId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not build cart.");

@@ -7,12 +7,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Basket, Check, Knife, Plate } from "@/components/icons";
 import { ErrorNote, MiniNav, RecipeImage, money } from "@/components/shared";
+import { totalWithFillers } from "@/lib/cart";
+import { readCachedPlan, writeCachedPlan } from "@/lib/plan-cache";
 import type { CartItem, FillerItem, PlanRecord } from "@/lib/types";
 
 export function CartClient({ initialPlanId }: { initialPlanId: string | null }) {
   const router = useRouter();
   const [planId, setPlanId] = useState(initialPlanId);
   const [plan, setPlan] = useState<PlanRecord | null>(null);
+  const [usingCachedPlan, setUsingCachedPlan] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [showAllGroceries, setShowAllGroceries] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -28,26 +31,40 @@ export function CartClient({ initialPlanId }: { initialPlanId: string | null }) 
       setError("No plan ID found. Build a cart from three dinners first.");
       return;
     }
-    void fetchPlan(id);
+    const cachedPlan = readCachedPlan(id);
+    if (cachedPlan) {
+      setPlan(cachedPlan);
+      setUsingCachedPlan(true);
+      setLoading(false);
+    }
+    void fetchPlan(id, cachedPlan);
   }, [initialPlanId]);
 
-  async function fetchPlan(id: string) {
-    setLoading(true);
+  async function fetchPlan(id: string, cachedPlan: PlanRecord | null = null) {
+    if (!cachedPlan) setLoading(true);
     setError("");
     try {
       const response = await fetch(`/api/plan/${id}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Plan not found.");
       setPlan(data.plan);
+      writeCachedPlan(data.plan);
+      setUsingCachedPlan(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Plan not found.");
+      if (cachedPlan) {
+        setPlan(cachedPlan);
+        setUsingCachedPlan(true);
+        setError("");
+      } else {
+        setError(err instanceof Error ? err.message : "Plan not found.");
+      }
     } finally {
       setLoading(false);
     }
   }
 
   async function toggleFiller(item: FillerItem) {
-    if (!planId) return;
+    if (!planId || !plan) return;
     setUpdating(item.productId);
     setError("");
     try {
@@ -59,8 +76,21 @@ export function CartClient({ initialPlanId }: { initialPlanId: string | null }) 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not update cart.");
       setPlan(data.plan);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not update cart.");
+      writeCachedPlan(data.plan);
+      setUsingCachedPlan(false);
+    } catch {
+      const fillers = plan.fillers.map((current) =>
+        current.productId === item.productId ? { ...current, selected: !item.selected } : current
+      );
+      const nextPlan = {
+        ...plan,
+        fillers,
+        totalCents: totalWithFillers(plan.cart, fillers)
+      };
+      setPlan(nextPlan);
+      writeCachedPlan(nextPlan);
+      setUsingCachedPlan(true);
+      setError("");
     } finally {
       setUpdating(null);
     }
@@ -219,6 +249,12 @@ export function CartClient({ initialPlanId }: { initialPlanId: string | null }) 
               </section>
             ) : null}
 
+            {usingCachedPlan ? (
+              <div className="t-body-s ink-soft mt-24">
+                Using the cart saved in this browser because persistent plan storage is not configured on the server yet.
+              </div>
+            ) : null}
+
             <ErrorNote>{error}</ErrorNote>
           </section>
 
@@ -269,7 +305,7 @@ export function CartClient({ initialPlanId }: { initialPlanId: string | null }) 
         </div>
       </div>
       {checkoutOpen && planId ? (
-        <CheckoutModal planId={planId} onClose={() => setCheckoutOpen(false)} onSuccess={() => router.push(`/p/${planId}`)} />
+        <CheckoutModal plan={plan} planId={planId} onClose={() => setCheckoutOpen(false)} onSuccess={() => router.push(`/p/${planId}`)} />
       ) : null}
     </main>
   );
@@ -399,7 +435,17 @@ function withFallbackMeta(item: FillerItem): Pick<FillerItem, "kind" | "reason" 
 
 type CheckoutMode = "regular" | "gurkerl";
 
-function CheckoutModal({ planId, onClose, onSuccess }: { planId: string; onClose: () => void; onSuccess: () => void }) {
+function CheckoutModal({
+  plan,
+  planId,
+  onClose,
+  onSuccess
+}: {
+  plan: PlanRecord;
+  planId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
   const [mode, setMode] = useState<CheckoutMode>("gurkerl");
   const [showPw, setShowPw] = useState(false);
   const [gurkerlEmail, setGurkerlEmail] = useState("");
@@ -428,9 +474,15 @@ function CheckoutModal({ planId, onClose, onSuccess }: { planId: string; onClose
     setSubmitting(true);
     setError("");
     try {
+      const snapshot = {
+        id: plan.id,
+        totalCents: plan.totalCents,
+        cart: plan.cart.map((item) => ({ productId: item.productId, qtyNeeded: item.qtyNeeded })),
+        fillers: plan.fillers.map((item) => ({ productId: item.productId, selected: item.selected }))
+      };
       const payload =
         mode === "gurkerl"
-          ? { method: "gurkerl", email: gurkerlEmail.trim(), password }
+          ? { method: "gurkerl", email: gurkerlEmail.trim(), password, snapshot }
           : {
               method: "regular",
               fullName: fullName.trim(),
@@ -439,7 +491,8 @@ function CheckoutModal({ planId, onClose, onSuccess }: { planId: string; onClose
               addressLine1: addressLine1.trim(),
               postalCode: postalCode.trim(),
               city: city.trim(),
-              notes: notes.trim()
+              notes: notes.trim(),
+              snapshot
             };
       const response = await fetch(`/api/plan/${planId}/order`, {
         method: "POST",
@@ -448,6 +501,35 @@ function CheckoutModal({ planId, onClose, onSuccess }: { planId: string; onClose
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || (mode === "gurkerl" ? "Could not add the cart." : "Could not save details."));
+      const nextPlan: PlanRecord = {
+        ...plan,
+        order:
+          mode === "gurkerl"
+            ? {
+                method: "gurkerl",
+                state: "cart",
+                orderId: data.orderId ?? "gurkerl-cart",
+                slotWindow: data.slotWindow ?? "Continue on Gurkerl to choose delivery and payment.",
+                placedAt: new Date().toISOString()
+              }
+            : {
+                method: "regular",
+                state: "details",
+                orderId: data.orderId ?? "regular-request",
+                slotWindow: data.slotWindow ?? "We'll confirm the next step by email.",
+                placedAt: new Date().toISOString(),
+                customer: {
+                  fullName: fullName.trim(),
+                  email: regularEmail.trim(),
+                  phone: phone.trim(),
+                  addressLine1: addressLine1.trim(),
+                  postalCode: postalCode.trim(),
+                  city: city.trim(),
+                  notes: notes.trim()
+                }
+              }
+      };
+      writeCachedPlan(nextPlan);
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : mode === "gurkerl" ? "Could not add the cart." : "Could not save details.");

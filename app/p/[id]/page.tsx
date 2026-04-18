@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { PlanClient } from "@/components/plan-client";
+import { PlanPageClient } from "@/components/plan-page-client";
 import { getPlan } from "@/lib/plan-store";
 
 type Props = {
@@ -9,6 +8,5 @@ type Props = {
 export default async function PublicPlanPage({ params }: Props) {
   const { id } = await params;
   const plan = await getPlan(id);
-  if (!plan) notFound();
-  return <PlanClient initialPlan={plan} />;
+  return <PlanPageClient initialPlan={plan} planId={id} />;
 }

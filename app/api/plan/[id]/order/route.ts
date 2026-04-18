@@ -11,11 +11,29 @@ type Context = {
   params: Promise<{ id: string }>;
 };
 
+const PlanSnapshotSchema = z.object({
+  id: z.string(),
+  totalCents: z.number(),
+  cart: z.array(
+    z.object({
+      productId: z.number(),
+      qtyNeeded: z.number()
+    })
+  ),
+  fillers: z.array(
+    z.object({
+      productId: z.number(),
+      selected: z.boolean()
+    })
+  )
+});
+
 const GurkerlOrderSchema = z.object({
   method: z.literal("gurkerl"),
   email: z.string().email(),
   password: z.string().min(1),
-  emailMe: z.string().email().optional().or(z.literal(""))
+  emailMe: z.string().email().optional().or(z.literal("")),
+  snapshot: PlanSnapshotSchema.optional()
 });
 
 const RegularOrderSchema = z.object({
@@ -26,7 +44,8 @@ const RegularOrderSchema = z.object({
   addressLine1: z.string().trim().min(5),
   postalCode: z.string().trim().min(3),
   city: z.string().trim().min(2),
-  notes: z.string().trim().max(400).optional().or(z.literal(""))
+  notes: z.string().trim().max(400).optional().or(z.literal("")),
+  snapshot: PlanSnapshotSchema.optional()
 });
 
 const OrderSchema = z.discriminatedUnion("method", [GurkerlOrderSchema, RegularOrderSchema]);
@@ -42,7 +61,17 @@ export async function POST(request: Request, context: Context) {
     const body = OrderSchema.parse(
       rawBody && typeof rawBody === "object" && !("method" in rawBody) ? { ...rawBody, method: "gurkerl" } : rawBody
     );
-    const plan = await getPlan(id);
+    const storedPlan = await getPlan(id);
+    const plan =
+      storedPlan ??
+      (body.snapshot && body.snapshot.id === id
+        ? {
+            id,
+            totalCents: body.snapshot.totalCents,
+            cart: body.snapshot.cart,
+            fillers: body.snapshot.fillers
+          }
+        : null);
     if (!plan) return NextResponse.json({ error: "Plan not found." }, { status: 404 });
     if (plan.totalCents < 3900) {
       return NextResponse.json({ error: "Gurkerl requires a €39 minimum before you continue." }, { status: 400 });
@@ -68,7 +97,7 @@ export async function POST(request: Request, context: Context) {
             }
           };
 
-    const updated = await putPlan({ ...plan, order });
+    const updated = storedPlan ? await putPlan({ ...storedPlan, order }) : null;
     const planUrl = new URL(`/p/${id}`, request.headers.get("origin") ?? "https://korbly.at").toString();
 
     if (body.method === "gurkerl" && body.emailMe && process.env.RESEND_API_KEY) {
@@ -85,7 +114,10 @@ export async function POST(request: Request, context: Context) {
 }
 
 async function addToGurkerlCart(
-  plan: NonNullable<Awaited<ReturnType<typeof getPlan>>>,
+  plan: {
+    cart: Array<{ productId: number; qtyNeeded: number }>;
+    fillers: Array<{ productId: number; selected: boolean }>;
+  },
   body: z.infer<typeof GurkerlOrderSchema>
 ) {
   const selectedFillers = plan.fillers.filter((item) => item.selected);

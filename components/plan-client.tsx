@@ -1,14 +1,18 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Basket, Check, Plate } from "@/components/icons";
 import { RecipeImage } from "@/components/shared";
+import { writeCachedPlan } from "@/lib/plan-cache";
 import type { PlanRecord } from "@/lib/types";
 
 export function PlanClient({ initialPlan }: { initialPlan: PlanRecord }) {
   const [plan, setPlan] = useState(initialPlan);
+  useEffect(() => {
+    writeCachedPlan(plan);
+  }, [plan]);
   const totalTime = plan.recipes.reduce((sum, recipe) => sum + recipe.timeMinutes, 0);
   const isRegularOrder = plan.order?.method === "regular";
   const isGurkerlCart = !isRegularOrder && plan.order?.state === "cart";
