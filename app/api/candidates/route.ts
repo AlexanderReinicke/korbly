@@ -12,6 +12,7 @@ const IntakeSchema = z.object({
   householdSize: z.union([z.literal(2), z.literal(3), z.literal(4)]),
   dietFilters: z.array(z.enum(DIET_FILTERS)).default([]),
   allergyText: z.string().max(500).default(""),
+  needText: z.string().max(600).default(""),
   cuisines: z.array(z.enum(CUISINES)).min(1).default(["Austrian"])
 });
 
@@ -55,10 +56,14 @@ export async function POST(request: Request) {
 function buildQueries(inputs: IntakeInputs): string[] {
   const cuisine = inputs.cuisines.join(", ");
   const diet = inputs.dietFilters.length ? `${inputs.dietFilters.join(", ")} ` : "";
+  const need = normalizeNeedText(inputs.needText);
+  const needSuffix = need ? ` mit diesen Wünschen: ${need}` : "";
   return [
-    `${diet}herzhaftes Abendessen ${cuisine} Gurkerl Küche für ${inputs.householdSize} Personen`,
-    `${diet}schnelles weeknight dinner ${cuisine} authentisch einfach`,
-    `${diet}drei gemütliche Dinner Rezepte ${cuisine} saisonal`
+    `${diet}herzhaftes Abendessen ${cuisine} Gurkerl Küche für ${inputs.householdSize} Personen${needSuffix}`,
+    `${diet}schnelles weeknight dinner ${cuisine} authentisch einfach${need ? ` ${need}` : ""}`,
+    need
+      ? `${diet}${need} ${cuisine} Rezepte einfach alltagstauglich`
+      : `${diet}drei gemütliche Dinner Rezepte ${cuisine} saisonal`
   ];
 }
 
@@ -71,4 +76,8 @@ function dedupe(candidates: CandidateRecipe[]): CandidateRecipe[] {
     out.push(candidate);
   }
   return out;
+}
+
+function normalizeNeedText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 160);
 }

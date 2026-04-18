@@ -5,6 +5,7 @@ coverage/
 .env
 .env.local
 .vercel/
+.claude/
 .claude/settings.local.json
 *.log
 .mcp-auth/
@@ -12,3 +13,4 @@ out-*.json
 slug-*.json
 tool-schemas.json
 tool-schemas.txt
+tsconfig.tsbuildinfo

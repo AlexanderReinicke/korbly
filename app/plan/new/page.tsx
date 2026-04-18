@@ -11,6 +11,7 @@ const defaultInputs: IntakeInputs = {
   householdSize: 2,
   dietFilters: [],
   allergyText: "",
+  needText: "",
   cuisines: ["Austrian"]
 };
 
@@ -21,20 +22,24 @@ export default function IntakePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const storedInputs = readJson<Partial<IntakeInputs>>("korbly.inputs") ?? {};
     const params = new URLSearchParams(window.location.search);
     const household = Number(params.get("household"));
+    const needText = params.get("need")?.trim() ?? "";
     const cuisines = params
       .get("cuisines")
       ?.split(",")
       .map((item) => item.trim())
       .filter((item): item is Cuisine => (CUISINES as readonly string[]).includes(item));
-    if ([2, 3, 4].includes(household) || cuisines?.length) {
-      setState((current) => ({
-        ...current,
-        householdSize: [2, 3, 4].includes(household) ? (household as 2 | 3 | 4) : current.householdSize,
-        cuisines: cuisines?.length ? cuisines : current.cuisines
-      }));
-    }
+    setState({
+      ...defaultInputs,
+      ...storedInputs,
+      householdSize: [2, 3, 4].includes(household)
+        ? (household as 2 | 3 | 4)
+        : (storedInputs.householdSize ?? defaultInputs.householdSize),
+      needText: needText || storedInputs.needText || defaultInputs.needText,
+      cuisines: cuisines?.length ? cuisines : storedInputs.cuisines?.length ? storedInputs.cuisines : defaultInputs.cuisines
+    });
   }, []);
 
   async function submit() {
@@ -85,6 +90,21 @@ export default function IntakePage() {
           How do you <i>eat?</i>
         </h1>
         <p className="t-body-m ink-soft mt-12">One minute. We use this to pick six dinners you&apos;d actually cook.</p>
+
+        <div className="mt-40">
+          <div className="t-label-xs mb-16">Tell us what you need</div>
+          <textarea
+            className="textarea"
+            rows={4}
+            maxLength={600}
+            placeholder="Weeknight dinners for two, easy lunches, snacks for guests, not too spicy, pantry top-up..."
+            value={state.needText}
+            onChange={(event) => setState({ ...state, needText: event.target.value })}
+          />
+          <p className="t-body-s ink-soft mt-12">
+            Optional. Share the shape of the week and we&apos;ll use it alongside your filters and cuisines.
+          </p>
+        </div>
 
         <div className="mt-48">
           <div className="t-label-xs mb-16">Cooking for</div>
@@ -165,4 +185,13 @@ export default function IntakePage() {
       </div>
     </main>
   );
+}
+
+function readJson<T>(key: string): T | null {
+  try {
+    const value = sessionStorage.getItem(key);
+    return value ? (JSON.parse(value) as T) : null;
+  } catch {
+    return null;
+  }
 }

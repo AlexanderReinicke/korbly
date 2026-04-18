@@ -15,6 +15,7 @@ const IntakeSchema = z.object({
   householdSize: z.union([z.literal(2), z.literal(3), z.literal(4)]),
   dietFilters: z.array(z.enum(DIET_FILTERS)).default([]),
   allergyText: z.string().max(500).default(""),
+  needText: z.string().max(600).default(""),
   cuisines: z.array(z.enum(CUISINES)).min(1)
 });
 

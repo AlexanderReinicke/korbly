@@ -10,8 +10,7 @@ export function MiniNav({ step }: { step?: "intake" | "pick" | "cart" }) {
   return (
     <div className="topnav">
       <div className="container" style={{ padding: "18px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24 }}>
-        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-          <div className="kmark">K</div>
+        <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
           <span className="t-display-s">Korbly</span>
         </Link>
         <div className="flex gap-8 mobile-hide" style={{ alignItems: "center", whiteSpace: "nowrap", flexShrink: 0 }}>

@@ -6,6 +6,7 @@ const config = [
   ...nextTs,
   {
     ignores: [
+      ".claude/**",
       ".next/**",
       "node_modules/**",
       "*.mjs",

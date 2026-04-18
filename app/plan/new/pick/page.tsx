@@ -12,6 +12,7 @@ const fallbackInputs: IntakeInputs = {
   householdSize: 2,
   dietFilters: [],
   allergyText: "",
+  needText: "",
   cuisines: ["Austrian"]
 };
 
@@ -25,7 +26,7 @@ export default function PickPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const storedInputs = readJson<IntakeInputs>("korbly.inputs") ?? fallbackInputs;
+    const storedInputs = { ...fallbackInputs, ...(readJson<Partial<IntakeInputs>>("korbly.inputs") ?? {}) };
     const storedCandidates = readJson<CandidateRecipe[]>("korbly.candidates");
     setInputs(storedInputs);
     if (storedCandidates?.length) {

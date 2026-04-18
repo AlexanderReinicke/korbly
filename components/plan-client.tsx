@@ -10,6 +10,11 @@ import type { PlanRecord } from "@/lib/types";
 export function PlanClient({ initialPlan }: { initialPlan: PlanRecord }) {
   const [plan, setPlan] = useState(initialPlan);
   const totalTime = plan.recipes.reduce((sum, recipe) => sum + recipe.timeMinutes, 0);
+  const orderMeta = plan.order
+    ? plan.order.orderId && plan.order.orderId !== "submitted"
+      ? `#${plan.order.orderId}`
+      : "Gurkerl xKorbly"
+    : `/p/${plan.id}`;
 
   async function toggleCooked(recipeId: number, cooked: boolean) {
     setPlan((current) => ({ ...current, cooked: { ...current.cooked, [String(recipeId)]: cooked } }));
@@ -29,22 +34,22 @@ export function PlanClient({ initialPlan }: { initialPlan: PlanRecord }) {
       <div style={{ background: "var(--ink)", color: "var(--paper)", minHeight: 56, display: "flex", alignItems: "center" }}>
         <div className="container" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", paddingTop: 12, paddingBottom: 12 }}>
           <div className="flex gap-16" style={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Link href="/" className="kmark" style={{ width: 24, height: 24, fontSize: 15, background: "var(--paprika)" }}>
-              K
+            <Link href="/" className="t-display-s">
+              Korbly
             </Link>
             {plan.order ? (
               <>
                 <span className="badge herb">
-                  <Check size={10} /> Order placed
+                  <Check size={10} /> Added to cart
                 </span>
-                <span className="t-data-m" style={{ opacity: 0.7 }}>delivery {plan.order.slotWindow}</span>
+                <span className="t-data-m" style={{ opacity: 0.7 }}>on Gurkerl xKorbly · delivery {plan.order.slotWindow}</span>
               </>
             ) : (
               <span className="t-data-m" style={{ opacity: 0.7 }}>Plan saved. Checkout not placed yet.</span>
             )}
           </div>
           <div className="t-data-m" style={{ opacity: 0.7 }}>
-            {plan.order ? `#${plan.order.orderId}` : `/p/${plan.id}`}
+            {orderMeta}
           </div>
         </div>
       </div>

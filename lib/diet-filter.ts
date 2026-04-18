@@ -44,8 +44,10 @@ export async function aiDietFilter(candidates: CandidateRecipe[], inputs: Intake
       prompt: [
         "Return only recipe IDs that comply with hard dietary/allergy exclusions.",
         "Do not invent recipes. Preserve cuisine preference loosely after safety filters.",
+        "If a soft request is present, prefer keeping recipes that match it when several options are equally safe.",
         `Hard filters: ${inputs.dietFilters.join(", ") || "none"}.`,
         `Avoid text: ${inputs.allergyText || "none"}.`,
+        `Soft request: ${inputs.needText || "none"}.`,
         `Preferred cuisines: ${inputs.cuisines.join(", ")}.`,
         "Candidates:",
         JSON.stringify(

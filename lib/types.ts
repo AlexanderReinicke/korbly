@@ -29,6 +29,7 @@ export type IntakeInputs = {
   householdSize: HouseholdSize;
   dietFilters: DietFilter[];
   allergyText: string;
+  needText: string;
   cuisines: Cuisine[];
 };
 
